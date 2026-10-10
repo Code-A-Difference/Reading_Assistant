@@ -23,6 +23,9 @@
       --current-fg: #19263a;
       --spoken-bg: #176643;
       --spoken-fg: #ffffff;
+      --speech-preview-bg: #ffe08a;
+      --speech-preview-fg: #17243a;
+      --speech-preview-edge: #d99c16;
       --success: #176643;
       --danger: #a12828;
       --reading-size: 1.5rem;
@@ -58,6 +61,9 @@
       --current-fg: #2d2519;
       --spoken-bg: #315e46;
       --spoken-fg: #fff;
+      --speech-preview-bg: #f2d27b;
+      --speech-preview-fg: #2d2519;
+      --speech-preview-edge: #9a6a18;
       --success: #315e46;
     }
     body[data-theme="dark"] {
@@ -75,6 +81,9 @@
       --current-fg: #fff6d3;
       --spoken-bg: #24774f;
       --spoken-fg: #fff;
+      --speech-preview-bg: #684f1d;
+      --speech-preview-fg: #fff6d3;
+      --speech-preview-edge: #f5ce69;
       --success: #92e1b5;
       --danger: #ffb4ab;
       background: var(--page);
@@ -95,6 +104,9 @@
       --current-fg: #000;
       --spoken-bg: #00ffff;
       --spoken-fg: #000;
+      --speech-preview-bg: #00ffff;
+      --speech-preview-fg: #000;
+      --speech-preview-edge: #ffed00;
       --success: #00ff7f;
       --danger: #ff8080;
       background: #000;
@@ -103,6 +115,8 @@
     button, select, input[type="checkbox"], input[type="range"], input[type="file"] { accent-color: var(--primary); }
     button, select, input[type="checkbox"], input[type="range"] { cursor: pointer; }
     button:disabled { cursor: not-allowed; }
+    button:not(:disabled) { transition: background-color .16s ease, color .16s ease, border-color .16s ease, transform .16s ease; }
+    button:not(:disabled):active { transform: translateY(1px) scale(.99); }
     a { color: var(--primary); }
     :focus-visible {
       outline: 3px solid var(--focus);
@@ -124,6 +138,7 @@
       width: min(100% - 2rem, 1050px);
       margin: 0 auto;
       padding: 1.5rem 0 3rem;
+      animation: app-arrive .42s cubic-bezier(.2, .75, .25, 1) both;
     }
     .site-header {
       display: flex;
@@ -141,6 +156,7 @@
       border-radius: .9rem;
       background: var(--primary-soft);
       font-size: 1.35rem;
+      animation: mark-arrive .5s cubic-bezier(.2, .75, .25, 1) both;
     }
     .brand h1 { margin: 0; font-size: 1.2rem; letter-spacing: -.02em; }
     .brand p { margin: .15rem 0 0; color: var(--muted); font-size: .85rem; }
@@ -157,6 +173,7 @@
       border-radius: 1.2rem;
       background: var(--surface);
       box-shadow: 0 16px 44px rgba(24, 42, 70, .08);
+      transition: box-shadow .24s ease, border-color .24s ease;
     }
     .setup-card { padding: clamp(1.25rem, 3vw, 2.25rem); }
     .eyebrow {
@@ -242,6 +259,7 @@
       font-weight: 750;
       text-align: center;
       text-decoration: none;
+      line-height: 1.25;
     }
     .button-primary { background: var(--primary); color: var(--surface); }
     body[data-theme="dark"] .button-primary,
@@ -266,6 +284,7 @@
     }
     [hidden] { display: none !important; }
     .reader-card { overflow: hidden; }
+    .reader-card.is-entering { animation: reader-arrive .44s cubic-bezier(.2, .75, .25, 1) both; }
     .reader-top { padding: clamp(1rem, 3vw, 1.7rem); border-bottom: 1px solid var(--border); }
     .reader-heading {
       display: flex;
@@ -292,6 +311,23 @@
     }
     .voice-state.active { border-color: var(--success); color: var(--success); }
     .voice-state.active::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; }
+    .voice-state.active::before { animation: listening-pulse 1.6s ease-in-out infinite; }
+    .reader-header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .55rem; }
+    .quick-reading-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .6rem .85rem;
+      padding: .75rem;
+      border: 1px solid var(--border);
+      border-radius: .85rem;
+      background: var(--surface-soft);
+    }
+    .size-stepper { display: inline-flex; align-items: center; gap: .45rem; }
+    .size-stepper .icon-button { min-width: 3rem; min-height: 3rem; padding: .45rem; font-size: 1.05rem; }
+    .quick-size-value { min-width: 4.4ch; color: var(--text); font-size: .95rem; font-weight: 800; text-align: center; }
+    .settings-toggle[aria-expanded="true"] { border-color: var(--primary); background: var(--primary-soft); }
+    .quick-reading-controls .hint { flex: 1 1 15rem; margin: 0; }
     .transport { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
     .transport .button-primary { min-width: 9rem; }
     .transport .button-secondary { min-width: 7.5rem; }
@@ -302,7 +338,20 @@
     .progress-meta { display: flex; justify-content: space-between; gap: .75rem; margin-bottom: .45rem; color: var(--muted); font-size: .82rem; }
     .progress-track { height: .6rem; overflow: hidden; border-radius: 999px; background: var(--surface-soft); }
     .progress-fill { height: 100%; width: 0; border-radius: inherit; background: var(--primary); transition: width .2s ease; }
-    .settings-panel { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 1rem clamp(1rem, 3vw, 1.7rem) 0; }
+    .settings-panel {
+      --settings-scale: 1.1;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: calc(.8rem * var(--settings-scale));
+      margin: 1rem clamp(1rem, 3vw, 1.7rem) 0;
+      padding: calc(1rem * var(--settings-scale));
+      animation: settings-arrive .22s ease-out both;
+    }
+    .settings-panel[hidden] { display: none; }
+    .settings-panel .option-title { font-size: calc(.92rem * var(--settings-scale)); }
+    .settings-panel .hint { font-size: calc(.82rem * var(--settings-scale)); }
+    .settings-panel .select-control,
+    .settings-panel .check-row { font-size: calc(1rem * var(--settings-scale)); }
+    .settings-panel input[type="range"] { min-height: 2.75rem; width: 100%; touch-action: pan-x; }
     .reader-main { padding: 1.25rem clamp(1rem, 4vw, 2.4rem) 1.5rem; }
     .reading-meta {
       display: flex;
@@ -341,8 +390,9 @@
       word-spacing: var(--reading-word-spacing);
       overflow-wrap: anywhere;
     }
-    .sentence { border-radius: .28rem; padding: .08em .04em; }
+    .sentence { border-radius: .28rem; padding: .08em .04em; transition: color .22s ease, background-color .22s ease; }
     .sentence.active { background: var(--current-bg); color: var(--current-fg); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+    .sentence.focus-arrival { animation: sentence-arrive .24s ease-out both; }
     .sentence.dimmed { color: var(--muted); }
     .word-span {
       display: inline;
@@ -351,9 +401,14 @@
       cursor: pointer;
       -webkit-box-decoration-break: clone;
       box-decoration-break: clone;
+      transition: background-color .18s ease, color .18s ease, box-shadow .18s ease;
     }
     .word-span:hover { outline: 1px solid var(--primary); outline-offset: 1px; }
     .word-span.spoken { background: var(--spoken-bg); color: var(--spoken-fg); }
+    .word-span.freshly-spoken { animation: word-confirmed .34s cubic-bezier(.2, .75, .25, 1) both; }
+    .word-span.voice-preview { box-shadow: inset 0 -.1em 0 var(--speech-preview-edge); }
+    .word-char { border-radius: .08em; transition: color .12s linear, background-color .12s linear, box-shadow .12s linear; }
+    .word-char.voice-heard { background-color: var(--speech-preview-bg); color: var(--speech-preview-fg); box-shadow: inset 0 -.08em 0 var(--speech-preview-edge); }
     .bionic-bold { font-weight: 800; }
     .word-tools {
       display: flex;
@@ -399,6 +454,21 @@
       white-space: nowrap !important;
       border: 0 !important;
     }
+    body.reduce-motion *,
+    body.reduce-motion *::before,
+    body.reduce-motion *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+      scroll-behavior: auto !important;
+    }
+    @keyframes app-arrive { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes mark-arrive { from { opacity: 0; transform: translateY(5px) scale(.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes reader-arrive { from { opacity: 0; transform: translateY(12px) scale(.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes settings-arrive { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes sentence-arrive { from { background-color: transparent; } to { background-color: var(--current-bg); } }
+    @keyframes word-confirmed { from { background-color: var(--speech-preview-bg); } to { background-color: var(--spoken-bg); } }
+    @keyframes listening-pulse { 0%, 100% { opacity: .65; transform: scale(.92); } 50% { opacity: 1; transform: scale(1.1); } }
     @media (max-width: 760px) {
       .settings-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -408,6 +478,9 @@
       .privacy-note { display: none; }
       .setup-options { grid-template-columns: 1fr; }
       .settings-panel { grid-template-columns: 1fr 1fr; margin-left: .6rem; margin-right: .6rem; padding: .8rem; }
+      .reader-header-actions { justify-content: flex-start; }
+      .quick-reading-controls { align-items: flex-start; }
+      .quick-reading-controls .hint { flex-basis: 100%; }
       .transport .range-control { flex-basis: 100%; }
       .reader-heading { margin-bottom: .8rem; }
       .paragraph-box { min-height: 10rem; }
@@ -415,6 +488,15 @@
     @media (max-width: 360px) {
       .settings-panel { grid-template-columns: 1fr; }
       .navigation-controls { gap: .5rem; }
+      .reader-header-actions { width: 100%; }
+      .reader-header-actions .settings-toggle { flex: 1 1 auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .app-shell, .brand-mark, .reader-card.is-entering, .settings-panel, .sentence.focus-arrival, .word-span.freshly-spoken, .voice-state.active::before {
+        animation: none !important;
+      }
+      .word-char, .word-span, .sentence, button, .card { transition: none !important; }
+      button:not(:disabled):active { transform: none; }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -500,7 +582,22 @@
               <h2 id="reader-title" tabindex="-1">One sentence at a time</h2>
               <p class="reader-subtitle">Choose how you want to read: on screen, with audio, or with voice tracking.</p>
             </div>
-            <span id="voice-badge" class="voice-state" role="status">Voice tracking off</span>
+            <div class="reader-header-actions">
+              <span id="voice-badge" class="voice-state" role="status">Voice tracking off</span>
+              <button id="settings-toggle" class="button-secondary settings-toggle" type="button" aria-expanded="false" aria-controls="reading-settings" aria-describedby="settings-help">
+                <span aria-hidden="true">⚙</span> Reading settings
+              </button>
+            </div>
+          </div>
+
+          <div class="quick-reading-controls" role="group" aria-label="Quick reading controls">
+            <span id="quick-size-label" class="sr-only">Reading text size</span>
+            <div class="size-stepper" role="group" aria-labelledby="quick-size-label">
+              <button id="text-smaller" class="icon-button" type="button" aria-label="Make reading text smaller" title="Make reading text smaller">A−</button>
+              <output id="quick-size-value" class="quick-size-value" aria-live="off">24 px</output>
+              <button id="text-larger" class="icon-button" type="button" aria-label="Make reading text larger" title="Make reading text larger">A+</button>
+            </div>
+            <p id="settings-help" class="hint">Adjust reading size here anytime. These quick controls stay easy to reach when the article text is large.</p>
           </div>
 
           <div class="transport" role="group" aria-label="Read-aloud controls">
@@ -529,7 +626,7 @@
           </div>
         </div>
 
-        <fieldset class="settings-panel">
+        <fieldset id="reading-settings" class="settings-panel" hidden>
           <legend class="sr-only">Reading display settings</legend>
           <div class="option-block">
             <label class="option-title" for="text-size">Text size <output id="text-size-value" for="text-size">24 px</output></label>
@@ -606,6 +703,26 @@
               <span>Advance when a sentence is read</span>
             </label>
           </div>
+          <div class="option-block">
+            <label class="option-title" for="settings-size">Settings size <output id="settings-size-value" for="settings-size">110%</output></label>
+            <input id="settings-size" type="range" min="1" max="1.4" step="0.05" value="1.1" aria-label="Settings text and spacing size">
+            <p class="hint">Changes the settings panel only; the quick text-size buttons stay fixed.</p>
+          </div>
+          <div class="option-block">
+            <span class="option-title">Speech feedback</span>
+            <label class="check-row" for="character-highlight-toggle">
+              <input type="checkbox" id="character-highlight-toggle" checked>
+              <span>Highlight recognized characters as I speak</span>
+            </label>
+            <p class="hint">Letters fill in as your browser returns speech-recognition results.</p>
+          </div>
+          <div class="option-block">
+            <span class="option-title">Motion</span>
+            <label class="check-row" for="reduce-motion-toggle">
+              <input type="checkbox" id="reduce-motion-toggle">
+              <span>Use calmer, reduced-motion transitions</span>
+            </label>
+          </div>
         </fieldset>
 
         <div class="reader-main">
@@ -680,6 +797,15 @@
       rateValue: $("speech-rate-value"),
       textSize: $("text-size"),
       textSizeValue: $("text-size-value"),
+      quickSizeValue: $("quick-size-value"),
+      textSmaller: $("text-smaller"),
+      textLarger: $("text-larger"),
+      settingsToggle: $("settings-toggle"),
+      settingsPanel: $("reading-settings"),
+      settingsSize: $("settings-size"),
+      settingsSizeValue: $("settings-size-value"),
+      characterHighlight: $("character-highlight-toggle"),
+      reduceMotion: $("reduce-motion-toggle"),
       font: $("font-choice"),
       theme: $("theme-choice"),
       line: $("line-choice"),
@@ -709,6 +835,11 @@
     let availableVoices = [];
     let savedVoiceURI = "";
     let finished = false;
+    let pendingSpeechPreview = new Map();
+    let speechPreviewFrame = 0;
+    let newlySpokenIndices = new Set();
+    let animateSentenceArrival = false;
+    const graphemeSegmenter = window.Intl && typeof Intl.Segmenter === "function" ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
 
     function normalizeWord(word) {
       return word.toLocaleLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]/gu, "");
@@ -716,6 +847,52 @@
 
     function wordsIn(sentence) {
       return sentence.trim().split(/\s+/).filter(Boolean);
+    }
+
+    function graphemes(text) {
+      if (graphemeSegmenter) return [...graphemeSegmenter.segment(text)].map(part => part.segment);
+      return Array.from(text);
+    }
+
+    function wordCore(word) {
+      const match = word.match(/^([^\p{L}\p{N}]*)([\p{L}\p{N}’‘'-]+)([^\p{L}\p{N}]*)$/u);
+      return match ? match[2] : word;
+    }
+
+    function previewCharacterCount(word, spokenPrefix) {
+      const core = wordCore(word);
+      const wanted = normalizeWord(spokenPrefix).length;
+      if (!wanted) return 0;
+      let normalizedLength = 0;
+      let visibleCount = 0;
+      for (const character of graphemes(core)) {
+        visibleCount++;
+        normalizedLength += normalizeWord(character).length;
+        if (normalizedLength >= wanted) return visibleCount;
+      }
+      return visibleCount;
+    }
+
+    function clearSpeechPreviewNow() {
+      pendingSpeechPreview = new Map();
+      if (speechPreviewFrame) window.cancelAnimationFrame(speechPreviewFrame);
+      speechPreviewFrame = 0;
+    }
+
+    function setSpeechPreview(preview) {
+      pendingSpeechPreview = preview;
+      if (speechPreviewFrame) return;
+      speechPreviewFrame = window.requestAnimationFrame(() => {
+        speechPreviewFrame = 0;
+        const words = elements.display.querySelectorAll(".word-span[data-word-index]");
+        words.forEach(word => {
+          const count = elements.characterHighlight.checked ? (pendingSpeechPreview.get(Number(word.dataset.wordIndex)) || 0) : 0;
+          word.classList.toggle("voice-preview", count > 0);
+          word.querySelectorAll(".word-char[data-char-index]").forEach((character, index) => {
+            character.classList.toggle("voice-heard", index < count);
+          });
+        });
+      });
     }
 
     function splitIntoSentences(text) {
@@ -752,6 +929,10 @@
     function announce(message) {
       elements.live.textContent = "";
       window.setTimeout(() => { elements.live.textContent = message; }, 25);
+    }
+
+    function reduceMotionEnabled() {
+      return elements.reduceMotion.checked || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     }
 
     function announceCurrentSentence() {
@@ -792,7 +973,10 @@
         rate: elements.rate.value,
         voice: elements.voiceChoice.value,
         language: elements.language.value,
-        autoAdvance: elements.autoAdvance.checked
+        autoAdvance: elements.autoAdvance.checked,
+        settingsSize: elements.settingsSize.value,
+        characterHighlight: elements.characterHighlight.checked,
+        reduceMotion: elements.reduceMotion.checked
       };
     }
 
@@ -803,6 +987,7 @@
     function applySettings() {
       const root = document.documentElement;
       const size = Number(elements.textSize.value);
+      const settingsSize = Number(elements.settingsSize.value);
       root.style.setProperty("--reading-size", size + "rem");
       root.style.setProperty("--reading-line-height", elements.line.value);
       root.style.setProperty("--reading-letter-spacing", elements.letter.value);
@@ -814,17 +999,26 @@
         mono: '"SFMono-Regular", Consolas, "Liberation Mono", monospace'
       };
       root.style.setProperty("--reading-font", fonts[elements.font.value] || fonts.serif);
+      elements.settingsPanel.style.setProperty("--settings-scale", String(settingsSize));
       document.body.dataset.theme = elements.theme.value;
-      elements.textSizeValue.textContent = (Math.round(size * 100) / 100) + " rem";
+      document.body.classList.toggle("reduce-motion", elements.reduceMotion.checked);
+      const sizeInPixels = Math.round(size * Number.parseFloat(getComputedStyle(root).fontSize));
+      elements.textSizeValue.textContent = sizeInPixels + " px";
+      elements.quickSizeValue.textContent = sizeInPixels + " px";
+      elements.textSmaller.disabled = size <= Number(elements.textSize.min);
+      elements.textLarger.disabled = size >= Number(elements.textSize.max);
+      elements.settingsSizeValue.textContent = Math.round(settingsSize * 100) + "%";
       elements.rateValue.textContent = Number(elements.rate.value).toFixed(2).replace(/0$/, "") + "×";
       saveSettings();
-      renderActiveLayout();
     }
 
     function loadSettings() {
       let saved;
       try { saved = JSON.parse(localStorage.getItem("fearless-reader-settings") || "null"); } catch (error) { saved = null; }
-      if (!saved || typeof saved !== "object") return;
+      if (!saved || typeof saved !== "object") {
+        elements.reduceMotion.checked = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        return;
+      }
       if (["1.15", "1.2", "1.25", "1.3", "1.35", "1.4", "1.45", "1.5", "1.55", "1.6", "1.65", "1.7", "1.75", "1.8", "1.85", "1.9", "1.95", "2", "2.05", "2.1", "2.15", "2.2", "2.25", "2.3"].includes(String(saved.size))) elements.textSize.value = saved.size;
       if (["serif", "sans", "verdana", "mono"].includes(saved.font)) elements.font.value = saved.font;
       if (["light", "cream", "dark", "contrast"].includes(saved.theme)) elements.theme.value = saved.theme;
@@ -834,9 +1028,30 @@
       if (typeof saved.dim === "boolean") elements.dim.checked = saved.dim;
       if (typeof saved.bionic === "boolean") elements.bionic.checked = saved.bionic;
       if (typeof saved.autoAdvance === "boolean") elements.autoAdvance.checked = saved.autoAdvance;
+      if (["1", "1.05", "1.1", "1.15", "1.2", "1.25", "1.3", "1.35", "1.4"].includes(String(saved.settingsSize))) elements.settingsSize.value = saved.settingsSize;
+      if (typeof saved.characterHighlight === "boolean") elements.characterHighlight.checked = saved.characterHighlight;
+      elements.reduceMotion.checked = typeof saved.reduceMotion === "boolean" ? saved.reduceMotion : window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (typeof saved.rate === "string") elements.rate.value = saved.rate;
       if (typeof saved.voice === "string") savedVoiceURI = saved.voice;
       if (typeof saved.language === "string" && [...elements.language.options].some(option => option.value === saved.language)) elements.language.value = saved.language;
+    }
+
+    function setSettingsOpen(open, moveFocus = true) {
+      elements.settingsPanel.hidden = !open;
+      elements.settingsToggle.setAttribute("aria-expanded", String(open));
+      if (moveFocus) {
+        if (open) elements.textSize.focus();
+        else elements.settingsToggle.focus();
+      }
+    }
+
+    function adjustTextSize(amount) {
+      const min = Number(elements.textSize.min);
+      const max = Number(elements.textSize.max);
+      const next = Math.max(min, Math.min(max, Math.round((Number(elements.textSize.value) + amount) * 20) / 20));
+      elements.textSize.value = next.toFixed(2);
+      applySettings();
+      announce("Reading text size " + elements.quickSizeValue.textContent + ".");
     }
 
     function initializeReadingSession() {
@@ -860,12 +1075,16 @@
       activeSentenceIndex = 0;
       lastSpokenWordIndex = -1;
       finished = false;
+      setSettingsOpen(false, false);
       elements.done.hidden = true;
       elements.setup.hidden = true;
+      elements.reader.classList.remove("is-entering");
       elements.reader.hidden = false;
+      void elements.reader.offsetWidth;
+      elements.reader.classList.add("is-entering");
       elements.voiceLive.checked = elements.voiceInit.checked;
       elements.reader.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        behavior: reduceMotionEnabled() ? "auto" : "smooth",
         block: "start"
       });
       renderActiveLayout();
@@ -875,8 +1094,8 @@
       else setVoiceEnabled(false);
     }
 
-    function appendWordMarkup(container, word, useBionic) {
-      if (!useBionic) {
+    function appendWordMarkup(container, word, useBionic, trackCharacters = false) {
+      if (!useBionic && !trackCharacters) {
         container.appendChild(document.createTextNode(word));
         return;
       }
@@ -887,16 +1106,32 @@
       }
       container.appendChild(document.createTextNode(match[1]));
       const core = match[2];
-      let boldLength = core.length > 5 ? Math.ceil(core.length * .4) : core.length > 3 ? 2 : 1;
-      const bold = document.createElement("span");
-      bold.className = "bionic-bold";
-      bold.textContent = core.slice(0, boldLength);
-      container.appendChild(bold);
-      container.appendChild(document.createTextNode(core.slice(boldLength) + match[3]));
+      const characters = graphemes(core);
+      const boldLength = characters.length > 5 ? Math.ceil(characters.length * .4) : characters.length > 3 ? 2 : 1;
+      characters.forEach((character, index) => {
+        if (trackCharacters) {
+          const letter = document.createElement("span");
+          letter.className = "word-char";
+          letter.dataset.charIndex = String(index);
+          letter.setAttribute("aria-hidden", "true");
+          if (useBionic && index < boldLength) letter.classList.add("bionic-bold");
+          letter.textContent = character;
+          container.appendChild(letter);
+        } else if (useBionic && index < boldLength) {
+          const bold = document.createElement("span");
+          bold.className = "bionic-bold";
+          bold.textContent = character;
+          container.appendChild(bold);
+        } else {
+          container.appendChild(document.createTextNode(character));
+        }
+      });
+      container.appendChild(document.createTextNode(match[3]));
     }
 
     function renderActiveLayout() {
       if (!paragraphsData.length || elements.reader.hidden) return;
+      clearSpeechPreviewNow();
       window.clearTimeout(completionTimer);
       const activeParagraph = paragraphsData[activeParagraphIndex];
       const id = currentSentenceId();
@@ -910,15 +1145,23 @@
         sentence.className = "sentence";
         if (sentenceIndex === activeSentenceIndex) {
           sentence.classList.add("active");
+          if (animateSentenceArrival) sentence.classList.add("focus-arrival");
           sentence.setAttribute("aria-current", "true");
           const words = wordsIn(sentenceText);
           words.forEach((word, wordIndex) => {
             const wordSpan = document.createElement("span");
             wordSpan.className = "word-span";
             wordSpan.dataset.wordIndex = String(wordIndex);
-            wordSpan.title = "Select to mark through this word";
-            if (state[wordIndex]) wordSpan.classList.add("spoken");
-            appendWordMarkup(wordSpan, word, elements.bionic.checked);
+            wordSpan.title = "Select to mark through the word " + word;
+            const accessibleWord = document.createElement("span");
+            accessibleWord.className = "sr-only";
+            accessibleWord.textContent = word;
+            wordSpan.appendChild(accessibleWord);
+            if (state[wordIndex]) {
+              wordSpan.classList.add("spoken");
+              if (newlySpokenIndices.has(wordIndex)) wordSpan.classList.add("freshly-spoken");
+            }
+            appendWordMarkup(wordSpan, word, elements.bionic.checked, true);
             sentence.appendChild(wordSpan);
             if (wordIndex < words.length - 1) sentence.appendChild(document.createTextNode(" "));
           });
@@ -951,6 +1194,11 @@
       updateStats();
     }
 
+    function revealActiveSentence() {
+      const active = elements.display.querySelector(".sentence.active");
+      if (active) active.scrollIntoView({ behavior: reduceMotionEnabled() ? "auto" : "smooth", block: "nearest", inline: "nearest" });
+    }
+
     function updateStats() {
       const wordsRead = sentenceWordStates.reduce((sum, state) => sum + state.filter(Boolean).length, 0);
       const sentencesRead = sentenceWordStates.filter(state => state.length > 0 && state.every(Boolean)).length;
@@ -962,9 +1210,14 @@
       const id = currentSentenceId();
       const state = sentenceWordStates[id];
       const target = Math.max(0, Math.min(targetIndex, state.length - 1));
-      for (let index = 0; index <= target; index++) state[index] = true;
+      newlySpokenIndices = new Set();
+      for (let index = 0; index <= target; index++) {
+        if (!state[index]) newlySpokenIndices.add(index);
+        state[index] = true;
+      }
       lastSpokenWordIndex = Math.max(lastSpokenWordIndex, target);
       renderActiveLayout();
+      newlySpokenIndices = new Set();
       const completed = state.every(Boolean);
       if (completed && !elements.done.hidden) return;
       if (completed) {
@@ -1015,7 +1268,10 @@
         activeParagraphIndex++;
         activeSentenceIndex = 0;
       }
+      animateSentenceArrival = true;
       renderActiveLayout();
+      animateSentenceArrival = false;
+      revealActiveSentence();
       if (!fromAuto && !readAloudActive) announceCurrentSentence();
       if (readAloudActive && !readAloudPaused) speakCurrentSentence();
     }
@@ -1030,7 +1286,10 @@
       }
       finished = false;
       elements.done.hidden = true;
+      animateSentenceArrival = true;
       renderActiveLayout();
+      animateSentenceArrival = false;
+      revealActiveSentence();
       if (!readAloudActive) announceCurrentSentence();
       if (readAloudActive && !readAloudPaused) speakCurrentSentence();
     }
@@ -1048,6 +1307,7 @@
     function exitReadingSession() {
       stopReadAloud();
       setVoiceEnabled(false);
+      elements.reader.classList.remove("is-entering");
       elements.reader.hidden = true;
       elements.setup.hidden = false;
       elements.text.focus();
@@ -1066,6 +1326,7 @@
         voiceActive = false;
         elements.voiceLive.checked = false;
         elements.voiceInit.checked = false;
+        setSpeechPreview(new Map());
         if (recognition) {
           try { recognition.stop(); } catch (error) { /* Recognition may already be stopped. */ }
         }
@@ -1076,6 +1337,7 @@
         voiceActive = false;
         elements.voiceLive.checked = false;
         elements.voiceInit.checked = false;
+        setSpeechPreview(new Map());
         toggleVoiceBadge(false, "Voice tracking unavailable");
         announce("Voice tracking is not available in this browser. You can still read on screen or use read aloud.");
         return;
@@ -1088,22 +1350,32 @@
         recognition.onstart = () => toggleVoiceBadge(true, "Listening for your voice");
         recognition.onresult = (event) => {
           if (!voiceActive || finished) return;
+          let interimTranscript = "";
           for (let resultIndex = event.resultIndex; resultIndex < event.results.length; resultIndex++) {
             const result = event.results[resultIndex];
-            if (result.isFinal && result[0] && (result[0].confidence == null || result[0].confidence >= 0.35)) processSpeechInput(result[0].transcript);
+            if (!result[0]) continue;
+            if (result.isFinal) {
+              if (result[0].confidence == null || result[0].confidence >= 0.35) processSpeechInput(result[0].transcript, true);
+            } else {
+              interimTranscript += " " + result[0].transcript;
+            }
           }
+          if (interimTranscript.trim()) processSpeechInput(interimTranscript, false);
+          else setSpeechPreview(new Map());
         };
         recognition.onerror = (event) => {
           if (event.error === "not-allowed" || event.error === "service-not-allowed") {
             voiceActive = false;
             elements.voiceLive.checked = false;
             elements.voiceInit.checked = false;
+            setSpeechPreview(new Map());
             toggleVoiceBadge(false, "Microphone access needed");
             announce("Voice tracking could not use the microphone. Check your browser's microphone permission, or keep reading with the buttons.");
           } else if (event.error === "audio-capture") {
             voiceActive = false;
             elements.voiceLive.checked = false;
             elements.voiceInit.checked = false;
+            setSpeechPreview(new Map());
             toggleVoiceBadge(false, "No microphone found");
             announce("No microphone was found. You can keep reading with the on-screen controls.");
           }
@@ -1129,23 +1401,70 @@
       }
     }
 
-    function processSpeechInput(transcript) {
-      const spokenWords = transcript.trim().split(/\s+/).map(normalizeWord).filter(Boolean);
-      const targetWords = currentWords().map(normalizeWord);
+    function processSpeechInput(transcript, isFinal = false) {
+      const spokenWords = (transcript.match(/[\p{L}\p{N}]+(?:[’‘'-][\p{L}\p{N}]+)*/gu) || []).map(normalizeWord).filter(Boolean);
+      const targetWords = currentWords();
+      const normalizedTargets = targetWords.map(normalizeWord);
+      const preview = new Map();
+      let cursor = Math.max(0, lastSpokenWordIndex + 1);
+      let lastMatchedIndex = -1;
+
       for (const spokenWord of spokenWords) {
-        let matchedIndex = -1;
-        for (let offset = 1; offset <= 3; offset++) {
-          const candidate = lastSpokenWordIndex + offset;
-          if (candidate < targetWords.length && targetWords[candidate] === spokenWord) {
-            matchedIndex = candidate;
+        let exactIndex = -1;
+        for (let candidate = cursor; candidate < Math.min(normalizedTargets.length, cursor + 4); candidate++) {
+          if (normalizedTargets[candidate] === spokenWord) {
+            exactIndex = candidate;
             break;
           }
         }
-        if (matchedIndex !== -1) {
-          setWordThrough(matchedIndex, true);
-          if (matchedIndex === targetWords.length - 1) break;
+        if (exactIndex >= 0) {
+          if (isFinal) {
+            lastMatchedIndex = exactIndex;
+            cursor = exactIndex + 1;
+          } else {
+            preview.set(exactIndex, graphemes(wordCore(targetWords[exactIndex])).length);
+            cursor = exactIndex + 1;
+          }
+          continue;
+        }
+
+        if (!isFinal) {
+          const candidate = normalizedTargets[cursor];
+          if (candidate && spokenWord.length <= candidate.length && candidate.startsWith(spokenWord)) {
+            preview.set(cursor, previewCharacterCount(targetWords[cursor], spokenWord));
+            cursor++;
+          }
         }
       }
+
+      if (isFinal) {
+        setSpeechPreview(new Map());
+        if (lastMatchedIndex >= lastSpokenWordIndex + 1) setWordThrough(lastMatchedIndex, true);
+      } else {
+        setSpeechPreview(preview);
+      }
+    }
+
+    function previewSpeechOffset(sentence, charIndex, charLength) {
+      if (voiceActive || !elements.characterHighlight.checked) return;
+      const words = wordsIn(sentence);
+      const preview = new Map();
+      let searchFrom = 0;
+      for (let index = 0; index < words.length; index++) {
+        const word = words[index];
+        const start = sentence.indexOf(word, searchFrom);
+        if (start < 0) continue;
+        const end = start + word.length;
+        searchFrom = end;
+        if (charIndex < start || charIndex > end) {
+          if (charIndex > end) preview.set(index, previewCharacterCount(word, word));
+          continue;
+        }
+        const through = sentence.slice(start, Math.min(end, Math.max(start + 1, charIndex + Math.max(1, charLength || 1))));
+        preview.set(index, previewCharacterCount(word, through));
+        break;
+      }
+      setSpeechPreview(preview);
     }
 
     function getVoices() {
@@ -1184,6 +1503,7 @@
       utterance.onend = () => {
         if (token !== utteranceToken) return;
         hasUtterance = false;
+        setSpeechPreview(new Map());
         if (!readAloudActive || readAloudPaused) return;
         window.setTimeout(() => {
           if (token !== utteranceToken || !readAloudActive || readAloudPaused) return;
@@ -1194,8 +1514,13 @@
       utterance.onerror = () => {
         if (token === utteranceToken) {
           hasUtterance = false;
+          setSpeechPreview(new Map());
           announce("Read aloud stopped. You can try again or continue with the on-screen text.");
         }
+      };
+      utterance.onboundary = (event) => {
+        if (token !== utteranceToken || readAloudPaused) return;
+        previewSpeechOffset(paragraphsData[activeParagraphIndex][activeSentenceIndex], event.charIndex, event.charLength);
       };
       window.speechSynthesis.speak(utterance);
       elements.readAloud.textContent = "↻ Restart sentence";
@@ -1232,6 +1557,7 @@
       readAloudPaused = false;
       hasUtterance = false;
       utteranceToken++;
+      setSpeechPreview(new Map());
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
       elements.readAloud.textContent = "▶ Read aloud";
       elements.pauseAloud.hidden = true;
@@ -1297,6 +1623,15 @@
     elements.next.addEventListener("click", () => navigateNext(false));
     elements.markNext.addEventListener("click", markNextWord);
     elements.undo.addEventListener("click", undoLastWord);
+    elements.textSmaller.addEventListener("click", () => adjustTextSize(-0.1));
+    elements.textLarger.addEventListener("click", () => adjustTextSize(0.1));
+    elements.settingsToggle.addEventListener("click", () => setSettingsOpen(elements.settingsPanel.hidden));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !elements.settingsPanel.hidden) {
+        event.preventDefault();
+        setSettingsOpen(false);
+      }
+    });
     $("exit-button").addEventListener("click", exitReadingSession);
     elements.display.addEventListener("click", (event) => {
       const word = event.target.closest(".word-span[data-word-index]");
@@ -1313,9 +1648,15 @@
       saveSettings();
       if (readAloudActive && !readAloudPaused) speakCurrentSentence();
     });
-    [elements.textSize, elements.font, elements.theme, elements.line, elements.letter, elements.word, elements.dim, elements.bionic].forEach(control => {
-      control.addEventListener("input", applySettings);
-      control.addEventListener("change", applySettings);
+    const displaySettings = [elements.textSize, elements.font, elements.theme, elements.line, elements.letter, elements.word, elements.dim, elements.bionic, elements.settingsSize, elements.characterHighlight, elements.reduceMotion];
+    const updateDisplaySetting = (control) => {
+      applySettings();
+      if (control === elements.dim || control === elements.bionic) renderActiveLayout();
+      if (control === elements.characterHighlight && !elements.characterHighlight.checked) setSpeechPreview(new Map());
+    };
+    displaySettings.forEach(control => {
+      control.addEventListener("input", () => updateDisplaySetting(control));
+      control.addEventListener("change", () => updateDisplaySetting(control));
     });
     elements.autoAdvance.addEventListener("change", saveSettings);
 
