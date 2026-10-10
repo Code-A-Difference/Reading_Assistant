@@ -23,9 +23,9 @@
       --current-fg: #19263a;
       --spoken-bg: #176643;
       --spoken-fg: #ffffff;
-      --speech-preview-bg: #ffe08a;
-      --speech-preview-fg: #17243a;
-      --speech-preview-edge: #d99c16;
+      --speech-preview-bg: #a7f3c4;
+      --speech-preview-fg: #0b4226;
+      --speech-preview-edge: #16834d;
       --success: #176643;
       --danger: #a12828;
       --reading-size: 1.5rem;
@@ -61,9 +61,9 @@
       --current-fg: #2d2519;
       --spoken-bg: #315e46;
       --spoken-fg: #fff;
-      --speech-preview-bg: #f2d27b;
-      --speech-preview-fg: #2d2519;
-      --speech-preview-edge: #9a6a18;
+      --speech-preview-bg: #bcebc8;
+      --speech-preview-fg: #193b24;
+      --speech-preview-edge: #36754a;
       --success: #315e46;
     }
     body[data-theme="dark"] {
@@ -81,9 +81,9 @@
       --current-fg: #fff6d3;
       --spoken-bg: #24774f;
       --spoken-fg: #fff;
-      --speech-preview-bg: #684f1d;
-      --speech-preview-fg: #fff6d3;
-      --speech-preview-edge: #f5ce69;
+      --speech-preview-bg: #58d68d;
+      --speech-preview-fg: #081a0f;
+      --speech-preview-edge: #a8ffd0;
       --success: #92e1b5;
       --danger: #ffb4ab;
       background: var(--page);
@@ -104,9 +104,9 @@
       --current-fg: #000;
       --spoken-bg: #00ffff;
       --spoken-fg: #000;
-      --speech-preview-bg: #00ffff;
+      --speech-preview-bg: #00ff7f;
       --speech-preview-fg: #000;
-      --speech-preview-edge: #ffed00;
+      --speech-preview-edge: #fff;
       --success: #00ff7f;
       --danger: #ff8080;
       background: #000;
@@ -328,9 +328,48 @@
     .quick-size-value { min-width: 4.4ch; color: var(--text); font-size: .95rem; font-weight: 800; text-align: center; }
     .settings-toggle[aria-expanded="true"] { border-color: var(--primary); background: var(--primary-soft); }
     .quick-reading-controls .hint { flex: 1 1 15rem; margin: 0; }
+    .voice-follow-panel {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: .7rem 1rem;
+      margin-top: .7rem;
+      padding: .8rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: .85rem;
+      background: var(--surface-soft);
+    }
+    .voice-follow-panel .check-row { align-items: center; font-weight: 750; }
+    .voice-follow-copy { display: grid; gap: .1rem; }
+    .voice-follow-copy .hint { font-weight: 400; }
     .transport { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
     .transport .button-primary { min-width: 9rem; }
     .transport .button-secondary { min-width: 7.5rem; }
+    .audio-options { flex: 1 1 100%; }
+    .audio-options summary {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.75rem;
+      padding: .6rem .9rem;
+      border: 1px solid var(--border);
+      border-radius: .65rem;
+      background: var(--surface);
+      color: var(--text);
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .audio-options-content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .7rem;
+      margin-top: .65rem;
+      padding: .75rem;
+      border: 1px solid var(--border);
+      border-radius: .75rem;
+      background: var(--surface-soft);
+    }
     .range-control { display: flex; flex: 1 1 13rem; align-items: center; gap: .6rem; min-width: 13rem; }
     .range-control label { font-size: .84rem; font-weight: 700; white-space: nowrap; }
     .range-control input { width: 100%; }
@@ -407,8 +446,26 @@
     .word-span.spoken { background: var(--spoken-bg); color: var(--spoken-fg); }
     .word-span.freshly-spoken { animation: word-confirmed .34s cubic-bezier(.2, .75, .25, 1) both; }
     .word-span.voice-preview { box-shadow: inset 0 -.1em 0 var(--speech-preview-edge); }
-    .word-char { border-radius: .08em; transition: color .12s linear, background-color .12s linear, box-shadow .12s linear; }
+    .word-char { border-radius: .08em; transition: color .03s linear, background-color .03s linear, box-shadow .03s linear; }
     .word-char.voice-heard { background-color: var(--speech-preview-bg); color: var(--speech-preview-fg); box-shadow: inset 0 -.08em 0 var(--speech-preview-edge); }
+    .confetti-layer {
+      position: fixed;
+      z-index: 1000;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .confetti-piece {
+      position: absolute;
+      top: -1rem;
+      left: var(--confetti-x);
+      width: var(--confetti-size);
+      height: calc(var(--confetti-size) * 1.65);
+      border-radius: .12rem;
+      background: var(--confetti-color);
+      opacity: .96;
+      animation: confetti-fall var(--confetti-duration) cubic-bezier(.2, .72, .25, 1) var(--confetti-delay) both;
+    }
     .bionic-bold { font-weight: 800; }
     .word-tools {
       display: flex;
@@ -469,6 +526,10 @@
     @keyframes sentence-arrive { from { background-color: transparent; } to { background-color: var(--current-bg); } }
     @keyframes word-confirmed { from { background-color: var(--speech-preview-bg); } to { background-color: var(--spoken-bg); } }
     @keyframes listening-pulse { 0%, 100% { opacity: .65; transform: scale(.92); } 50% { opacity: 1; transform: scale(1.1); } }
+    @keyframes confetti-fall {
+      from { opacity: 1; transform: translate3d(0, -5vh, 0) rotate(0); }
+      to { opacity: 0; transform: translate3d(var(--confetti-drift), 110vh, 0) rotate(var(--confetti-rotation)); }
+    }
     @media (max-width: 760px) {
       .settings-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -483,6 +544,7 @@
       .quick-reading-controls .hint { flex-basis: 100%; }
       .transport .range-control { flex-basis: 100%; }
       .reader-heading { margin-bottom: .8rem; }
+      .voice-follow-panel { align-items: flex-start; }
       .paragraph-box { min-height: 10rem; }
     }
     @media (max-width: 360px) {
@@ -492,7 +554,7 @@
       .reader-header-actions .settings-toggle { flex: 1 1 auto; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .app-shell, .brand-mark, .reader-card.is-entering, .settings-panel, .sentence.focus-arrival, .word-span.freshly-spoken, .voice-state.active::before {
+      .app-shell, .brand-mark, .reader-card.is-entering, .settings-panel, .sentence.focus-arrival, .word-span.freshly-spoken, .voice-state.active::before, .confetti-piece {
         animation: none !important;
       }
       .word-char, .word-span, .sentence, button, .card { transition: none !important; }
@@ -524,9 +586,10 @@
 
     <main id="main-content">
       <section id="setup-card" class="card setup-card" aria-labelledby="setup-title">
-        <p class="eyebrow">Your reading space</p>
-        <h2 id="setup-title">Take the next sentence at your pace.</h2>
-        <p class="intro">Paste or type a passage, then choose the supports that work for you. Voice tracking is optional; every reading control also has a button or keyboard alternative.</p>
+        <p class="eyebrow">Step 1 · Choose your text</p>
+        <h2 id="setup-title">What would you like to read?</h2>
+        <p class="intro">Paste a passage or open a text file. Choose Follow along if you want the reader to listen to your voice, then select Start reading. You can switch speech tracking on or off while reading.</p>
+        <p id="finish-feedback" class="done-message" role="status" hidden></p>
 
         <label class="field-label" for="text-input">Text to read</label>
         <textarea id="text-input" placeholder="Paste an article, a chapter, or any text you want to read. Separate paragraphs with a blank line." spellcheck="true"></textarea>
@@ -578,14 +641,13 @@
         <div class="reader-top">
           <div class="reader-heading">
             <div>
-              <p class="eyebrow">Reading session</p>
+              <p class="eyebrow">Step 2 · Read at your pace</p>
               <h2 id="reader-title" tabindex="-1">One sentence at a time</h2>
-              <p class="reader-subtitle">Choose how you want to read: on screen, with audio, or with voice tracking.</p>
+              <p class="reader-subtitle">Read the highlighted sentence, listen to it, or turn on Follow my voice. Use Next sentence to keep going.</p>
             </div>
             <div class="reader-header-actions">
-              <span id="voice-badge" class="voice-state" role="status">Voice tracking off</span>
               <button id="settings-toggle" class="button-secondary settings-toggle" type="button" aria-expanded="false" aria-controls="reading-settings" aria-describedby="settings-help">
-                <span aria-hidden="true">⚙</span> Reading settings
+                <span aria-hidden="true">⚙</span> Reading &amp; accessibility
               </button>
             </div>
           </div>
@@ -600,20 +662,36 @@
             <p id="settings-help" class="hint">Adjust reading size here anytime. These quick controls stay easy to reach when the article text is large.</p>
           </div>
 
-          <div class="transport" role="group" aria-label="Read-aloud controls">
-            <button id="read-aloud-button" class="button-primary" type="button" aria-label="Read the text aloud from this sentence">▶ Read aloud</button>
+          <div class="voice-follow-panel" role="group" aria-label="Speech tracking">
+            <label class="check-row" for="voice-live-toggle">
+              <input type="checkbox" id="voice-live-toggle">
+              <span class="voice-follow-copy">
+                <span>Follow my voice</span>
+                <span class="hint">Turn on to light up each character as you read. Turn off whenever you like.</span>
+              </span>
+            </label>
+            <span id="voice-badge" class="voice-state" role="status">Voice tracking off</span>
+          </div>
+
+          <div class="transport" role="group" aria-label="Listen to the current sentence">
+            <button id="read-aloud-button" class="button-primary" type="button" aria-label="Read the current sentence aloud">▶ Listen to this sentence</button>
             <button id="pause-aloud-button" class="button-secondary" type="button" hidden>Pause</button>
             <button id="stop-aloud-button" class="button-quiet" type="button" hidden>Stop audio</button>
-            <div class="range-control">
-              <label for="speech-voice">Voice</label>
-              <select id="speech-voice" class="select-control" aria-label="Read-aloud voice">
-                <option value="">Automatic</option>
-              </select>
-            </div>
-            <div class="range-control">
-              <label for="speech-rate">Audio speed <output id="speech-rate-value" for="speech-rate">1.0×</output></label>
-              <input id="speech-rate" type="range" min="0.65" max="1.5" step="0.05" value="1" aria-label="Read-aloud speed">
-            </div>
+            <details class="audio-options">
+              <summary>Voice and speed options</summary>
+              <div class="audio-options-content">
+                <div class="range-control">
+                  <label for="speech-voice">Voice</label>
+                  <select id="speech-voice" class="select-control" aria-label="Read-aloud voice">
+                    <option value="">Automatic</option>
+                  </select>
+                </div>
+                <div class="range-control">
+                  <label for="speech-rate">Audio speed <output id="speech-rate-value" for="speech-rate">1.0×</output></label>
+                  <input id="speech-rate" type="range" min="0.65" max="1.5" step="0.05" value="1" aria-label="Read-aloud speed">
+                </div>
+              </div>
+            </details>
           </div>
           <div class="progress-wrap">
             <div class="progress-meta">
@@ -627,7 +705,7 @@
         </div>
 
         <fieldset id="reading-settings" class="settings-panel" hidden>
-          <legend class="sr-only">Reading display settings</legend>
+          <legend class="sr-only">Reading and accessibility settings</legend>
           <div class="option-block">
             <label class="option-title" for="text-size">Text size <output id="text-size-value" for="text-size">24 px</output></label>
             <input id="text-size" type="range" min="1.15" max="2.3" step="0.05" value="1.5" aria-label="Reading text size">
@@ -690,14 +768,7 @@
             </label>
           </div>
           <div class="option-block">
-            <span class="option-title">Voice tracking</span>
-            <label class="check-row" for="voice-live-toggle">
-              <input type="checkbox" id="voice-live-toggle">
-              <span>Follow my voice</span>
-            </label>
-          </div>
-          <div class="option-block">
-            <span class="option-title">Pacing</span>
+              <span class="option-title">Pacing</span>
             <label class="check-row" for="auto-advance-toggle">
               <input type="checkbox" id="auto-advance-toggle">
               <span>Advance when a sentence is read</span>
@@ -709,12 +780,12 @@
             <p class="hint">Changes the settings panel only; the quick text-size buttons stay fixed.</p>
           </div>
           <div class="option-block">
-            <span class="option-title">Speech feedback</span>
+            <span class="option-title">Green character tracking</span>
             <label class="check-row" for="character-highlight-toggle">
               <input type="checkbox" id="character-highlight-toggle" checked>
               <span>Highlight recognized characters as I speak</span>
             </label>
-            <p class="hint">Letters fill in as your browser returns speech-recognition results.</p>
+            <p class="hint">Each recognized letter fills green as soon as your browser returns an interim speech result.</p>
           </div>
           <div class="option-block">
             <span class="option-title">Motion</span>
@@ -722,6 +793,18 @@
               <input type="checkbox" id="reduce-motion-toggle">
               <span>Use calmer, reduced-motion transitions</span>
             </label>
+          </div>
+          <div class="option-block">
+            <span class="option-title">Finish celebration</span>
+            <label class="check-row" for="confetti-toggle">
+              <input type="checkbox" id="confetti-toggle" checked>
+              <span>Show confetti after I finish</span>
+            </label>
+            <label class="check-row" for="victory-sound-toggle">
+              <input type="checkbox" id="victory-sound-toggle" checked>
+              <span>Play a short victory sound</span>
+            </label>
+            <p class="hint">These happen only after you choose Finish reading. Confetti is suppressed when reduced motion is on.</p>
           </div>
         </fieldset>
 
@@ -741,7 +824,7 @@
           <div class="word-tools" role="group" aria-label="Word marking controls">
             <button id="mark-next-word" class="button-secondary" type="button">Mark next word read</button>
             <button id="undo-word" class="button-quiet" type="button">Undo last word</button>
-            <p class="hint">You can also select a word in the sentence to mark through it.</p>
+            <p class="hint">Or select a word in the sentence to mark through it.</p>
           </div>
           <div class="navigation-controls" role="group" aria-label="Sentence navigation">
             <button id="prev-btn" class="button-secondary" type="button"><span aria-hidden="true">←</span> Previous sentence</button>
@@ -758,6 +841,7 @@
     </main>
     <footer class="site-footer">This page has no account or server. Speech recognition and read aloud depend on the features available in your browser and device. Voice recognition may send audio to the browser's speech service; check its privacy settings if that matters to you.</footer>
   </div>
+  <div id="confetti-layer" class="confetti-layer" aria-hidden="true" hidden></div>
   <div id="live-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
   <script>
@@ -787,6 +871,8 @@
       next: $("next-btn"),
       live: $("live-announcer"),
       done: $("done-message"),
+      finishFeedback: $("finish-feedback"),
+      confettiLayer: $("confetti-layer"),
       markNext: $("mark-next-word"),
       undo: $("undo-word"),
       readAloud: $("read-aloud-button"),
@@ -806,6 +892,8 @@
       settingsSizeValue: $("settings-size-value"),
       characterHighlight: $("character-highlight-toggle"),
       reduceMotion: $("reduce-motion-toggle"),
+      confetti: $("confetti-toggle"),
+      victorySound: $("victory-sound-toggle"),
       font: $("font-choice"),
       theme: $("theme-choice"),
       line: $("line-choice"),
@@ -835,6 +923,7 @@
     let availableVoices = [];
     let savedVoiceURI = "";
     let finished = false;
+    let confettiTimer = 0;
     let pendingSpeechPreview = new Map();
     let speechPreviewFrame = 0;
     let newlySpokenIndices = new Set();
@@ -947,6 +1036,7 @@
     }
 
     function updateTextCount() {
+      elements.finishFeedback.hidden = true;
       const text = elements.text.value.trim();
       const words = text ? (text.match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu) || []).length : 0;
       const paragraphs = text ? text.split(/\r?\n[\t ]*\r?\n/).filter(part => part.trim()).length : 0;
@@ -976,7 +1066,9 @@
         autoAdvance: elements.autoAdvance.checked,
         settingsSize: elements.settingsSize.value,
         characterHighlight: elements.characterHighlight.checked,
-        reduceMotion: elements.reduceMotion.checked
+        reduceMotion: elements.reduceMotion.checked,
+        confetti: elements.confetti.checked,
+        victorySound: elements.victorySound.checked
       };
     }
 
@@ -1031,6 +1123,8 @@
       if (["1", "1.05", "1.1", "1.15", "1.2", "1.25", "1.3", "1.35", "1.4"].includes(String(saved.settingsSize))) elements.settingsSize.value = saved.settingsSize;
       if (typeof saved.characterHighlight === "boolean") elements.characterHighlight.checked = saved.characterHighlight;
       elements.reduceMotion.checked = typeof saved.reduceMotion === "boolean" ? saved.reduceMotion : window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (typeof saved.confetti === "boolean") elements.confetti.checked = saved.confetti;
+      if (typeof saved.victorySound === "boolean") elements.victorySound.checked = saved.victorySound;
       if (typeof saved.rate === "string") elements.rate.value = saved.rate;
       if (typeof saved.voice === "string") savedVoiceURI = saved.voice;
       if (typeof saved.language === "string" && [...elements.language.options].some(option => option.value === saved.language)) elements.language.value = saved.language;
@@ -1075,6 +1169,7 @@
       activeSentenceIndex = 0;
       lastSpokenWordIndex = -1;
       finished = false;
+      elements.finishFeedback.hidden = true;
       setSettingsOpen(false, false);
       elements.done.hidden = true;
       elements.setup.hidden = true;
@@ -1260,7 +1355,8 @@
     function navigateNext(fromAuto = false) {
       if (!paragraphsData.length || finished) return;
       if (atLastSentence()) {
-        finishReading();
+        if (fromAuto) announce("You reached the final sentence. Select Finish reading when you are ready to finish.");
+        else finishReading();
         return;
       }
       if (activeSentenceIndex < paragraphsData[activeParagraphIndex].length - 1) activeSentenceIndex++;
@@ -1294,24 +1390,99 @@
       if (readAloudActive && !readAloudPaused) speakCurrentSentence();
     }
 
+    function showConfetti() {
+      if (!elements.confetti.checked || reduceMotionEnabled()) return;
+      window.clearTimeout(confettiTimer);
+      const layer = elements.confettiLayer;
+      layer.replaceChildren();
+      layer.hidden = false;
+      const colors = ["#16834d", "#72d99a", "#ffd166", "#61a5fa", "#f28cb1", "#a78bfa"];
+      for (let index = 0; index < 48; index++) {
+        const piece = document.createElement("span");
+        piece.className = "confetti-piece";
+        piece.style.setProperty("--confetti-x", (Math.random() * 100).toFixed(2) + "vw");
+        piece.style.setProperty("--confetti-size", (6 + Math.random() * 8).toFixed(1) + "px");
+        piece.style.setProperty("--confetti-color", colors[index % colors.length]);
+        piece.style.setProperty("--confetti-duration", (1.25 + Math.random() * .55).toFixed(2) + "s");
+        piece.style.setProperty("--confetti-delay", (Math.random() * .18).toFixed(2) + "s");
+        piece.style.setProperty("--confetti-drift", ((Math.random() - .5) * 180).toFixed(0) + "px");
+        piece.style.setProperty("--confetti-rotation", (360 + Math.random() * 900).toFixed(0) + "deg");
+        layer.appendChild(piece);
+      }
+      confettiTimer = window.setTimeout(() => {
+        layer.hidden = true;
+        layer.replaceChildren();
+      }, 2300);
+    }
+
+    function playVictorySound() {
+      if (!elements.victorySound.checked) return;
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      let audio;
+      try {
+        audio = new AudioContextClass();
+        const start = audio.currentTime;
+        [659.25, 783.99, 1046.5].forEach((frequency, index) => {
+          const oscillator = audio.createOscillator();
+          const gain = audio.createGain();
+          const noteStart = start + index * .11;
+          oscillator.type = "sine";
+          oscillator.frequency.setValueAtTime(frequency, noteStart);
+          gain.gain.setValueAtTime(.0001, noteStart);
+          gain.gain.exponentialRampToValueAtTime(.12, noteStart + .025);
+          gain.gain.exponentialRampToValueAtTime(.0001, noteStart + .22);
+          oscillator.connect(gain);
+          gain.connect(audio.destination);
+          oscillator.start(noteStart);
+          oscillator.stop(noteStart + .23);
+        });
+        const resumed = audio.resume();
+        if (resumed && typeof resumed.catch === "function") resumed.catch(() => {});
+        window.setTimeout(() => audio.close().catch(() => {}), 650);
+      } catch (error) {
+        if (audio && audio.state !== "closed") audio.close().catch(() => {});
+      }
+    }
+
+    function resetToEditor(message) {
+      elements.reader.classList.remove("is-entering");
+      elements.reader.hidden = true;
+      elements.setup.hidden = false;
+      elements.settingsPanel.hidden = true;
+      elements.settingsToggle.setAttribute("aria-expanded", "false");
+      elements.display.replaceChildren();
+      elements.done.hidden = true;
+      paragraphsData = [];
+      sentenceWordStates = [];
+      activeParagraphIndex = 0;
+      activeSentenceIndex = 0;
+      totalSentences = 0;
+      totalWords = 0;
+      lastSpokenWordIndex = -1;
+      finished = false;
+      elements.finishFeedback.textContent = message;
+      elements.finishFeedback.hidden = false;
+      elements.text.focus();
+      announce(message);
+    }
+
     function finishReading() {
+      if (finished) return;
       finished = true;
-      elements.done.hidden = false;
-      elements.done.textContent = "You reached the end of this text. You can review the passage, go back, or edit it.";
+      window.clearTimeout(completionTimer);
       stopReadAloud();
-      if (voiceActive) setVoiceEnabled(false);
-      renderActiveLayout();
-      announce("You reached the end of this text.");
+      setVoiceEnabled(false);
+      const message = "You finished reading! Your text is back in the editor, ready to change or read again.";
+      showConfetti();
+      playVictorySound();
+      resetToEditor(message);
     }
 
     function exitReadingSession() {
       stopReadAloud();
       setVoiceEnabled(false);
-      elements.reader.classList.remove("is-entering");
-      elements.reader.hidden = true;
-      elements.setup.hidden = false;
-      elements.text.focus();
-      announce("Back at the text editor.");
+      resetToEditor("Your passage is back in the editor. You can change it or start reading again.");
     }
 
     function toggleVoiceBadge(active, message) {
@@ -1507,8 +1678,10 @@
         if (!readAloudActive || readAloudPaused) return;
         window.setTimeout(() => {
           if (token !== utteranceToken || !readAloudActive || readAloudPaused) return;
-          if (atLastSentence()) finishReading();
-          else navigateNext(true);
+          if (atLastSentence()) {
+            stopReadAloud();
+            announce("You reached the final sentence. Select Finish reading when you are ready to finish.");
+          } else navigateNext(true);
         }, 250);
       };
       utterance.onerror = () => {
@@ -1648,7 +1821,7 @@
       saveSettings();
       if (readAloudActive && !readAloudPaused) speakCurrentSentence();
     });
-    const displaySettings = [elements.textSize, elements.font, elements.theme, elements.line, elements.letter, elements.word, elements.dim, elements.bionic, elements.settingsSize, elements.characterHighlight, elements.reduceMotion];
+    const displaySettings = [elements.textSize, elements.font, elements.theme, elements.line, elements.letter, elements.word, elements.dim, elements.bionic, elements.settingsSize, elements.characterHighlight, elements.reduceMotion, elements.confetti, elements.victorySound];
     const updateDisplaySetting = (control) => {
       applySettings();
       if (control === elements.dim || control === elements.bionic) renderActiveLayout();
