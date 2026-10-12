@@ -14,8 +14,8 @@ Open FearlessReader.html in a modern web browser. There is no build step, accoun
 - Use the always-visible A− and A+ controls to resize reading text without opening the settings panel.
 - Keep display settings collapsed while reading, then open them on demand; independently resize the settings text and spacing.
 - Optionally bold the beginnings of words.
-- See recognized characters highlight green with near-immediate visual updates as interim results arrive; confirmed words stay highlighted. Read-aloud playback can also follow its current word where browser boundary events are available.
-- Turn the always-visible **Follow my voice** control on or off at any time. Recognized characters highlight green as soon as the browser returns interim speech results.
+- See recognized characters highlight green with near-immediate visual updates as interim results arrive; confirmed voice-matched characters stay green. Read-aloud playback can also follow its current word where browser boundary events are available.
+- Turn the always-visible **Follow my voice** control on or off at any time. Live status tells you when the microphone is active, speech is heard, or the browser cannot reach its speech service.
 - Mark words read by selecting a word, using **Mark next word read**, or enabling speech tracking.
 - Undo the last word mark and review session word and sentence counts.
 - Listen with browser read-aloud voices, choose an installed voice, and adjust playback speed. Read aloud moves through the passage sentence by sentence.
@@ -34,7 +34,7 @@ Reading preferences are intended to help readers find a comfortable presentation
 
 The app has no account, analytics, or backend and does not itself upload or save passage text. Display preferences are stored in local browser storage.
 
-Microphone access is requested only when voice tracking is enabled. Speech recognition is provided by the browser and may send audio to the browser vendor's speech service; character previews turn green as quickly as the interim transcript the browser returns. The browser may take time to provide partial results, and the app cannot highlight speech it has not received. Read-aloud voices and word-boundary events also come from the browser or operating system. Availability and behavior vary by browser, device, language, and installed voices; on-screen reading and manual controls remain available if these features are unsupported.
+Microphone access is requested only when voice tracking is enabled. Speech recognition is provided by the browser and may send audio to the browser vendor's speech service; character previews turn green as quickly as the interim transcript the browser returns. The browser may take time to provide partial results, and the app cannot highlight speech it has not received. If tracking does not start, allow microphone access, check the live status message, and select the language you are speaking. Read-aloud voices and word-boundary events also come from the browser or operating system. Availability and behavior vary by browser, device, language, and installed voices; on-screen reading and manual controls remain available if these features are unsupported.
 
 ## License
 
