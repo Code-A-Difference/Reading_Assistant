@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f7fb">
   <meta name="description" content="A calm, customizable reading assistant with optional speech tracking and read-aloud controls.">
-  <title>Fearless Reader | Reading Assistant</title>
+  <title>Fearless Reader — Reading Assistant</title>
   <style>
     :root {
       color-scheme: light;
@@ -448,6 +448,7 @@
     .word-span.voice-preview { box-shadow: inset 0 -.1em 0 var(--speech-preview-edge); }
     .word-char { border-radius: .08em; transition: color .03s linear, background-color .03s linear, box-shadow .03s linear; }
     .word-char.voice-heard { background-color: var(--speech-preview-bg); color: var(--speech-preview-fg); box-shadow: inset 0 -.08em 0 var(--speech-preview-edge); }
+    .word-span.voice-spoken .word-char { background-color: var(--speech-preview-bg); color: var(--speech-preview-fg); box-shadow: inset 0 -.08em 0 var(--speech-preview-edge); }
     .confetti-layer {
       position: fixed;
       z-index: 1000;
@@ -671,6 +672,7 @@
               </span>
             </label>
             <span id="voice-badge" class="voice-state" role="status">Voice tracking off</span>
+            <p class="hint">If speech is not detected, allow microphone access and choose the language you are speaking.</p>
           </div>
 
           <div class="transport" role="group" aria-label="Listen to the current sentence">
@@ -906,6 +908,7 @@
 
     let paragraphsData = [];
     let sentenceWordStates = [];
+    let sentenceVoiceWordStates = [];
     let activeParagraphIndex = 0;
     let activeSentenceIndex = 0;
     let totalSentences = 0;
@@ -1109,6 +1112,10 @@
       try { saved = JSON.parse(localStorage.getItem("fearless-reader-settings") || "null"); } catch (error) { saved = null; }
       if (!saved || typeof saved !== "object") {
         elements.reduceMotion.checked = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const browserLanguage = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+        const exactLanguage = [...elements.language.options].find(option => option.value.toLowerCase() === browserLanguage.toLowerCase());
+        const matchingLanguage = exactLanguage || [...elements.language.options].find(option => option.value.slice(0, 2).toLowerCase() === browserLanguage.slice(0, 2).toLowerCase());
+        if (matchingLanguage) elements.language.value = matchingLanguage.value;
         return;
       }
       if (["1.15", "1.2", "1.25", "1.3", "1.35", "1.4", "1.45", "1.5", "1.55", "1.6", "1.65", "1.7", "1.75", "1.8", "1.85", "1.9", "1.95", "2", "2.05", "2.1", "2.15", "2.2", "2.25", "2.3"].includes(String(saved.size))) elements.textSize.value = saved.size;
@@ -1164,6 +1171,7 @@
       }
       totalSentences = paragraphsData.reduce((sum, paragraph) => sum + paragraph.length, 0);
       sentenceWordStates = paragraphsData.flatMap(paragraph => paragraph.map(sentence => Array(wordsIn(sentence).length).fill(false)));
+      sentenceVoiceWordStates = paragraphsData.flatMap(paragraph => paragraph.map(sentence => Array(wordsIn(sentence).length).fill(false)));
       totalWords = sentenceWordStates.reduce((sum, state) => sum + state.length, 0);
       activeParagraphIndex = 0;
       activeSentenceIndex = 0;
@@ -1231,6 +1239,7 @@
       const activeParagraph = paragraphsData[activeParagraphIndex];
       const id = currentSentenceId();
       const state = sentenceWordStates[id];
+      const voiceState = sentenceVoiceWordStates[id] || [];
       const nextUnread = state.findIndex(read => !read);
       lastSpokenWordIndex = nextUnread < 0 ? state.length - 1 : nextUnread - 1;
 
@@ -1254,6 +1263,7 @@
             wordSpan.appendChild(accessibleWord);
             if (state[wordIndex]) {
               wordSpan.classList.add("spoken");
+              if (voiceState[wordIndex] && elements.characterHighlight.checked) wordSpan.classList.add("voice-spoken");
               if (newlySpokenIndices.has(wordIndex)) wordSpan.classList.add("freshly-spoken");
             }
             appendWordMarkup(wordSpan, word, elements.bionic.checked, true);
@@ -1301,7 +1311,7 @@
       elements.sentencesRead.textContent = sentencesRead + " / " + totalSentences;
     }
 
-    function setWordThrough(targetIndex, fromVoice = false) {
+    function setWordThrough(targetIndex) {
       const id = currentSentenceId();
       const state = sentenceWordStates[id];
       const target = Math.max(0, Math.min(targetIndex, state.length - 1));
@@ -1330,7 +1340,7 @@
         announce("This sentence is already marked as read.");
         return;
       }
-      setWordThrough(next, false);
+      setWordThrough(next);
       if (next === state.length - 1) announce("Sentence complete.");
     }
 
@@ -1455,6 +1465,7 @@
       elements.done.hidden = true;
       paragraphsData = [];
       sentenceWordStates = [];
+      sentenceVoiceWordStates = [];
       activeParagraphIndex = 0;
       activeSentenceIndex = 0;
       totalSentences = 0;
@@ -1513,26 +1524,43 @@
         announce("Voice tracking is not available in this browser. You can still read on screen or use read aloud.");
         return;
       }
+      if (window.isSecureContext === false) {
+        voiceActive = false;
+        elements.voiceLive.checked = false;
+        elements.voiceInit.checked = false;
+        setSpeechPreview(new Map());
+        toggleVoiceBadge(false, "Voice tracking needs a secure page");
+        announce("Voice tracking needs a secure HTTPS page or localhost. You can still read on screen or use read aloud.");
+        return;
+      }
       if (!recognition) {
         recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
-        recognition.onstart = () => toggleVoiceBadge(true, "Listening for your voice");
+        recognition.maxAlternatives = 3;
+        recognition.onstart = () => toggleVoiceBadge(true, "Microphone on · speak now");
+        recognition.onaudiostart = () => toggleVoiceBadge(true, "Microphone active · speak now");
+        recognition.onspeechstart = () => toggleVoiceBadge(true, "Speech detected · matching words");
+        recognition.onspeechend = () => toggleVoiceBadge(true, "Listening · ready for your next words");
+        recognition.onnomatch = () => toggleVoiceBadge(true, "Speech heard · looking for a matching word");
         recognition.onresult = (event) => {
           if (!voiceActive || finished) return;
           let interimTranscript = "";
           for (let resultIndex = event.resultIndex; resultIndex < event.results.length; resultIndex++) {
             const result = event.results[resultIndex];
-            if (!result[0]) continue;
+            if (!result || !result.length) continue;
+            const transcript = bestSpeechTranscript(result);
+            if (!transcript) {
+              if (result.isFinal) setSpeechPreview(new Map());
+              continue;
+            }
             if (result.isFinal) {
-              if (result[0].confidence == null || result[0].confidence >= 0.35) processSpeechInput(result[0].transcript, true);
+              processSpeechInput(transcript, true);
             } else {
-              interimTranscript += " " + result[0].transcript;
+              interimTranscript += " " + transcript;
             }
           }
           if (interimTranscript.trim()) processSpeechInput(interimTranscript, false);
-          else setSpeechPreview(new Map());
         };
         recognition.onerror = (event) => {
           if (event.error === "not-allowed" || event.error === "service-not-allowed") {
@@ -1549,13 +1577,29 @@
             setSpeechPreview(new Map());
             toggleVoiceBadge(false, "No microphone found");
             announce("No microphone was found. You can keep reading with the on-screen controls.");
+          } else if (event.error === "network") {
+            voiceActive = false;
+            elements.voiceLive.checked = false;
+            elements.voiceInit.checked = false;
+            setSpeechPreview(new Map());
+            toggleVoiceBadge(false, "Speech service unavailable · check connection");
+            announce("The browser speech service could not be reached. Check your connection, then turn Follow my voice off and on to retry.");
+          } else if (event.error === "language-not-supported") {
+            voiceActive = false;
+            elements.voiceLive.checked = false;
+            elements.voiceInit.checked = false;
+            setSpeechPreview(new Map());
+            toggleVoiceBadge(false, "Speech language unavailable");
+            announce("This browser speech service does not support the selected language. Choose another speech language and turn Follow my voice on again.");
+          } else if (event.error === "no-speech") {
+            toggleVoiceBadge(true, "No speech detected · speak toward your microphone");
+          } else if (event.error !== "aborted") {
+            toggleVoiceBadge(false, "Voice recognition error · try again");
+            announce("Voice recognition had a problem. Check the microphone and speech language, then turn Follow my voice off and on to retry.");
           }
         };
         recognition.onend = () => {
-          if (!voiceActive || finished) {
-            if (!voiceActive) toggleVoiceBadge(false, "Voice tracking off");
-            return;
-          }
+          if (!voiceActive || finished) return;
           voiceRestartTimer = window.setTimeout(() => {
             if (!voiceActive || !recognition) return;
             try { recognition.start(); } catch (error) { /* A start already in progress is harmless. */ }
@@ -1568,8 +1612,74 @@
       elements.voiceInit.checked = true;
       toggleVoiceBadge(false, "Starting voice tracking…");
       try { recognition.start(); } catch (error) {
-        toggleVoiceBadge(false, "Voice tracking unavailable");
+        if (error && error.name === "InvalidStateError") {
+          toggleVoiceBadge(false, "Restarting voice tracking…");
+          voiceRestartTimer = window.setTimeout(() => {
+            if (voiceActive && recognition) {
+              try { recognition.start(); } catch (retryError) {
+                voiceActive = false;
+                elements.voiceLive.checked = false;
+                elements.voiceInit.checked = false;
+                setSpeechPreview(new Map());
+                toggleVoiceBadge(false, "Voice tracking could not start");
+                announce("Voice tracking could not start. Check microphone access and try turning Follow my voice off and on again.");
+              }
+            }
+          }, 350);
+        } else {
+          voiceActive = false;
+          elements.voiceLive.checked = false;
+          elements.voiceInit.checked = false;
+          setSpeechPreview(new Map());
+          toggleVoiceBadge(false, "Voice tracking could not start");
+          announce("Voice tracking could not start. Check microphone access and try again.");
+        }
       }
+    }
+
+    function bestSpeechTranscript(result) {
+      let bestTranscript = "";
+      let bestScore = -1;
+      for (let index = 0; index < result.length; index++) {
+        const alternative = result[index];
+        const transcript = alternative && alternative.transcript ? alternative.transcript.trim() : "";
+        if (!transcript) continue;
+        const score = scoreSpeechTranscript(transcript) + (Number(alternative.confidence) || 0) * .05;
+        if (score > bestScore) {
+          bestScore = score;
+          bestTranscript = transcript;
+        }
+      }
+      return bestTranscript;
+    }
+
+    function scoreSpeechTranscript(transcript) {
+      const spokenWords = (transcript.match(/[\p{L}\p{N}]+(?:[’‘'-][\p{L}\p{N}]+)*/gu) || []).map(normalizeWord).filter(Boolean);
+      const targets = currentWords().map(normalizeWord);
+      let cursor = Math.max(0, lastSpokenWordIndex + 1);
+      let score = 0;
+      for (const spokenWord of spokenWords) {
+        const limit = Math.min(targets.length, cursor + 5);
+        let matchIndex = -1;
+        for (let candidate = cursor; candidate < limit; candidate++) {
+          if (targets[candidate] === spokenWord) {
+            matchIndex = candidate;
+            score += 4 - Math.min(2, candidate - cursor) * .25;
+            break;
+          }
+        }
+        if (matchIndex < 0) {
+          for (let candidate = cursor; candidate < limit; candidate++) {
+            if (targets[candidate] && targets[candidate].startsWith(spokenWord)) {
+              matchIndex = candidate;
+              score += 1 + Math.min(1, spokenWord.length / targets[candidate].length);
+              break;
+            }
+          }
+        }
+        if (matchIndex >= 0) cursor = matchIndex + 1;
+      }
+      return score;
     }
 
     function processSpeechInput(transcript, isFinal = false) {
@@ -1577,12 +1687,14 @@
       const targetWords = currentWords();
       const normalizedTargets = targetWords.map(normalizeWord);
       const preview = new Map();
+      const matchedWordIndices = [];
       let cursor = Math.max(0, lastSpokenWordIndex + 1);
       let lastMatchedIndex = -1;
 
       for (const spokenWord of spokenWords) {
         let exactIndex = -1;
-        for (let candidate = cursor; candidate < Math.min(normalizedTargets.length, cursor + 4); candidate++) {
+        const searchLimit = Math.min(normalizedTargets.length, cursor + 5);
+        for (let candidate = cursor; candidate < searchLimit; candidate++) {
           if (normalizedTargets[candidate] === spokenWord) {
             exactIndex = candidate;
             break;
@@ -1591,6 +1703,7 @@
         if (exactIndex >= 0) {
           if (isFinal) {
             lastMatchedIndex = exactIndex;
+            matchedWordIndices.push(exactIndex);
             cursor = exactIndex + 1;
           } else {
             preview.set(exactIndex, graphemes(wordCore(targetWords[exactIndex])).length);
@@ -1599,21 +1712,31 @@
           continue;
         }
 
-        if (!isFinal) {
-          const candidate = normalizedTargets[cursor];
-          if (candidate && spokenWord.length <= candidate.length && candidate.startsWith(spokenWord)) {
-            preview.set(cursor, previewCharacterCount(targetWords[cursor], spokenWord));
-            cursor++;
+        let prefixIndex = -1;
+        for (let candidate = cursor; candidate < searchLimit; candidate++) {
+          if (normalizedTargets[candidate] && normalizedTargets[candidate].startsWith(spokenWord)) {
+            prefixIndex = candidate;
+            break;
           }
+        }
+        if (prefixIndex >= 0) {
+          preview.set(prefixIndex, previewCharacterCount(targetWords[prefixIndex], spokenWord));
+          cursor = prefixIndex + 1;
         }
       }
 
+      const matchedFinalWord = lastMatchedIndex >= lastSpokenWordIndex + 1;
       if (isFinal) {
-        setSpeechPreview(new Map());
-        if (lastMatchedIndex >= lastSpokenWordIndex + 1) setWordThrough(lastMatchedIndex, true);
-      } else {
-        setSpeechPreview(preview);
+        if (matchedFinalWord) {
+          setSpeechPreview(new Map());
+          const voiceState = sentenceVoiceWordStates[currentSentenceId()];
+          matchedWordIndices.forEach(index => { voiceState[index] = true; });
+          setWordThrough(lastMatchedIndex);
+        }
       }
+      setSpeechPreview(preview);
+      if (matchedFinalWord || preview.size) toggleVoiceBadge(true, "Speech matched · tracking words");
+      else if (spokenWords.length) toggleVoiceBadge(true, "Speech heard · looking for a matching word");
     }
 
     function previewSpeechOffset(sentence, charIndex, charLength) {
@@ -1808,7 +1931,7 @@
     $("exit-button").addEventListener("click", exitReadingSession);
     elements.display.addEventListener("click", (event) => {
       const word = event.target.closest(".word-span[data-word-index]");
-      if (word) setWordThrough(Number(word.dataset.wordIndex), false);
+      if (word) setWordThrough(Number(word.dataset.wordIndex));
     });
     elements.readAloud.addEventListener("click", startReadAloud);
     elements.pauseAloud.addEventListener("click", pauseReadAloud);
@@ -1824,7 +1947,7 @@
     const displaySettings = [elements.textSize, elements.font, elements.theme, elements.line, elements.letter, elements.word, elements.dim, elements.bionic, elements.settingsSize, elements.characterHighlight, elements.reduceMotion, elements.confetti, elements.victorySound];
     const updateDisplaySetting = (control) => {
       applySettings();
-      if (control === elements.dim || control === elements.bionic) renderActiveLayout();
+      if (control === elements.dim || control === elements.bionic || control === elements.characterHighlight) renderActiveLayout();
       if (control === elements.characterHighlight && !elements.characterHighlight.checked) setSpeechPreview(new Map());
     };
     displaySettings.forEach(control => {
