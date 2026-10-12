@@ -499,6 +499,9 @@
     .phonetic-spelling { font-size: 1.15em; font-weight: 750; }
     .pronunciation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-top: .8rem; }
     .pronunciation-note { color: var(--muted); font-size: .82em; }
+    #pronunciation-ipa-details { margin-top: .45rem; font-size: .82em; }
+    #pronunciation-ipa-details summary { color: var(--primary); cursor: pointer; font-weight: 700; }
+    #pronunciation-ipa-details p { margin: .35rem 0; overflow-wrap: anywhere; }
     .navigation-controls { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin-top: 1rem; }
     .navigation-controls button { min-height: 3.25rem; }
     .reader-footer {
@@ -876,7 +879,14 @@
             </div>
             <p id="pronunciation-status" role="status" aria-live="polite">Pronunciation information appears here.</p>
             <dl class="pronunciation-details">
-              <div><dt>Phonetic spelling</dt><dd id="pronunciation-phonetic" class="phonetic-spelling">Loading…</dd></div>
+              <div>
+                <dt>Say it like</dt>
+                <dd id="pronunciation-phonetic" class="phonetic-spelling">Loading…</dd>
+                <details id="pronunciation-ipa-details" hidden>
+                  <summary>Show phonetic symbols (IPA)</summary>
+                  <p id="pronunciation-ipa" class="pronunciation-note"></p>
+                </details>
+              </div>
               <div><dt>Syllables</dt><dd id="pronunciation-syllables">Loading…</dd></div>
               <div><dt>Rhymes</dt><dd id="pronunciation-rhymes">Loading…</dd></div>
               <div><dt>Meaning</dt><dd id="pronunciation-meaning">Loading…</dd></div>
@@ -941,6 +951,8 @@
       pronunciationWord: $("pronunciation-word"),
       pronunciationStatus: $("pronunciation-status"),
       pronunciationPhonetic: $("pronunciation-phonetic"),
+      pronunciationIpa: $("pronunciation-ipa"),
+      pronunciationIpaDetails: $("pronunciation-ipa-details"),
       pronunciationSyllables: $("pronunciation-syllables"),
       pronunciationRhymes: $("pronunciation-rhymes"),
       pronunciationMeaning: $("pronunciation-meaning"),
@@ -1050,7 +1062,9 @@
       if (speechPreviewFrame) return;
       speechPreviewFrame = window.requestAnimationFrame(() => {
         speechPreviewFrame = 0;
-        const words = elements.display.querySelectorAll(".word-span[data-word-index]");
+        // Word indices restart at zero in each sentence. Scope previews to the
+        // active sentence so an interim match cannot light another sentence.
+        const words = elements.display.querySelectorAll(".sentence.active .word-span[data-word-index]");
         words.forEach(word => {
           const count = elements.characterHighlight.checked ? (pendingSpeechPreview.get(Number(word.dataset.wordIndex)) || 0) : 0;
           word.classList.toggle("voice-preview", count > 0);
@@ -1923,7 +1937,8 @@
       ];
       const [dictionaryResult, detailResult, rhymeResult] = await Promise.all(requests);
       const dictionaryEntries = Array.isArray(dictionaryResult) ? dictionaryResult : [];
-      const entry = dictionaryEntries.find(item => item && normalizeWord(item.word || "") === normalizeWord(word)) || dictionaryEntries[0] || null;
+      // Never borrow the first suggestion's pronunciation for a different word.
+      const entry = dictionaryEntries.find(item => item && normalizeWord(item.word || "") === normalizeWord(word)) || null;
       const detailItems = Array.isArray(detailResult) ? detailResult : [];
       const datamuseEntry = detailItems.find(item => item && normalizeWord(item.word || "") === normalizeWord(word)) || null;
       const rhymes = Array.isArray(rhymeResult) ? rhymeResult
@@ -1937,15 +1952,92 @@
       return elements.language.value.slice(0, 2).toLowerCase() + ":" + normalizeWord(word);
     }
 
+    const arpabetCodes = new Set("AA AE AH AO AW AY B CH D DH EH ER EY F G HH IH IY JH K L M N NG OW OY P R S SH T TH UH UW V W Y Z ZH".split(" "));
+
+    function cleanIpa(value) {
+      if (typeof value !== "string") return "";
+      const spelling = value.trim().replace(/^[\s\/\[\]()]+|[\s\/\[\]()]+$/g, "");
+      if (!spelling || /\d/.test(spelling)) return "";
+      const codeWords = spelling.toUpperCase().match(/[A-Z]+[012]?/g) || [];
+      const remaining = spelling.toUpperCase().replace(/[A-Z]+[012]?|[\s\/\[\]().·ˈˌːˑ-]/g, "");
+      if (codeWords.length && !remaining && codeWords.every(code => arpabetCodes.has(code.replace(/[012]$/, "")))) return "";
+      if (!/^[A-Za-z\u0250-\u02AF\u1D00-\u1D7F\u0300-\u036F\s\/\[\]().·ˈˌːˑ-]+$/u.test(spelling)) return "";
+      return spelling;
+    }
+
     function phoneticSpelling(data) {
-      const dictionaryPhonetic = data.entry && (
-        data.entry.phonetic ||
-        (Array.isArray(data.entry.phonetics) && data.entry.phonetics.find(item => item && item.text)?.text)
-      );
-      if (dictionaryPhonetic) return dictionaryPhonetic;
+      const dictionaryValues = data.entry ? [
+        data.entry.phonetic,
+        ...(Array.isArray(data.entry.phonetics) ? data.entry.phonetics.map(item => item && item.text) : [])
+      ] : [];
+      for (const value of dictionaryValues) {
+        const ipa = cleanIpa(value);
+        if (ipa) return ipa;
+      }
       const tags = data.datamuseEntry && Array.isArray(data.datamuseEntry.tags) ? data.datamuseEntry.tags : [];
-      const pronunciationTag = tags.find(tag => typeof tag === "string" && tag.startsWith("pron:"));
-      return pronunciationTag ? pronunciationTag.slice(5) : "";
+      const pronunciationTags = tags.filter(tag => typeof tag === "string" && tag.startsWith("pron:"));
+      for (const tag of pronunciationTags) {
+        const ipa = cleanIpa(tag.slice(5));
+        if (ipa) return ipa;
+      }
+      return "";
+    }
+
+    function simpleSoundGuide(ipa) {
+      const source = String(ipa || "").toLowerCase();
+      const multiSounds = [
+        ["t͡ʃ", "ch", false], ["d͡ʒ", "j", false], ["tʃ", "ch", false], ["dʒ", "j", false],
+        ["aɪ", "eye", true], ["aʊ", "ow", true], ["eɪ", "ay", true], ["ɔɪ", "oy", true], ["oʊ", "oh", true], ["əʊ", "oh", true],
+        ["ɪə", "ear", true], ["eə", "air", true], ["ɛə", "air", true], ["ʊə", "oor", true], ["ɜː", "er", true], ["ɑː", "ah", true], ["ɔː", "aw", true], ["iː", "ee", true], ["uː", "oo", true],
+        ["ɝ", "er", true], ["ɚ", "er", true], ["ɐ", "uh", true], ["ə", "uh", true], ["ʌ", "uh", true], ["ɜ", "er", true], ["ɪ", "ih", true], ["i", "ee", true], ["e", "eh", true], ["ɛ", "eh", true], ["æ", "a", true], ["ɑ", "ah", true], ["ɒ", "o", true], ["ɔ", "aw", true], ["ʊ", "u", true], ["u", "oo", true],
+        ["θ", "th", false], ["ð", "th", false], ["ʃ", "sh", false], ["ʒ", "zh", false], ["ŋ", "ng", false], ["ɹ", "r", false], ["ɾ", "d", false], ["ɡ", "g", false], ["ɲ", "ny", false], ["ʎ", "ly", false], ["ʝ", "y", false], ["ɣ", "g", false], ["β", "b", false], ["x", "h", false], ["ɫ", "l", false],
+        ["p", "p", false], ["b", "b", false], ["t", "t", false], ["d", "d", false], ["k", "k", false], ["g", "g", false], ["f", "f", false], ["v", "v", false], ["s", "s", false], ["z", "z", false], ["h", "h", false], ["m", "m", false], ["n", "n", false], ["l", "l", false], ["r", "r", false], ["j", "y", false], ["w", "w", false], ["a", "a", true], ["o", "oh", true]
+      ];
+      const tokens = [];
+      let index = 0;
+      let markNextVowel = false;
+      let stressedVowel = -1;
+      while (index < source.length) {
+        const character = source[index];
+        if (character === "ˈ") { markNextVowel = true; index++; continue; }
+        if (character === "ˌ" || character === "ː" || character === "ˑ" || character === "͡" || character === "͜" || character === "ʰ" || character === "ʲ") { index++; continue; }
+        if (character === "." || character === "·" || /\s/.test(character)) { tokens.push({ boundary: true }); index++; continue; }
+        const match = multiSounds.find(([ipaPart]) => source.startsWith(ipaPart, index));
+        if (!match) return "";
+        const token = { sound: match[0], guide: match[1], vowel: match[2], boundary: false };
+        if (match[2] && markNextVowel && stressedVowel < 0) stressedVowel = tokens.filter(item => item.vowel).length;
+        if (match[2]) markNextVowel = false;
+        tokens.push(token);
+        index += match[0].length;
+      }
+      const boundaries = [];
+      const nuclei = [];
+      tokens.forEach((token, tokenIndex) => { if (token.vowel) nuclei.push(tokenIndex); });
+      for (let nucleus = 0; nucleus < nuclei.length - 1; nucleus++) {
+        const previous = nuclei[nucleus];
+        const next = nuclei[nucleus + 1];
+        const cluster = tokens.slice(previous + 1, next).filter(token => !token.boundary).map(token => token.sound);
+        const joined = cluster.join("");
+        const onset3 = new Set(["spl", "spr", "str", "skr", "skw"]);
+        const onset2 = new Set(["pr", "br", "tr", "dr", "kr", "gr", "fr", "θr", "pl", "bl", "kl", "gl", "fl", "sl", "sm", "sn", "sp", "st", "sk", "sw", "tw", "dw", "kw", "pj", "bj", "kj", "gj", "mj", "nj"]);
+        const onsetSize = cluster.length >= 3 && onset3.has(joined.slice(-3)) ? 3 : cluster.length >= 2 && onset2.has(joined.slice(-2)) ? 2 : Math.min(1, cluster.length);
+        boundaries.push(next - onsetSize);
+      }
+      const parts = [];
+      let start = 0;
+      for (const boundary of boundaries) {
+        if (boundary > start) parts.push(tokens.slice(start, boundary));
+        start = boundary;
+      }
+      if (start < tokens.length) parts.push(tokens.slice(start));
+      let syllableIndex = 0;
+      const rendered = parts.map(part => {
+        const hasVowel = part.some(token => token.vowel);
+        const text = part.filter(token => !token.boundary).map(token => token.guide).join("");
+        const emphasize = hasVowel && syllableIndex++ === stressedVowel;
+        return emphasize ? text.toUpperCase() : text;
+      }).filter(Boolean);
+      return rendered.join("-");
     }
 
     function pronunciationDefinitions(data) {
@@ -1963,9 +2055,12 @@
 
     function renderPronunciationData(data, word) {
       const phonetic = phoneticSpelling(data);
+      const soundGuide = simpleSoundGuide(phonetic);
       const syllableCount = Number(data.datamuseEntry && data.datamuseEntry.numSyllables) || estimateSyllableCount(word);
       const hasSyllableLookup = Number(data.datamuseEntry && data.datamuseEntry.numSyllables) > 0;
-      elements.pronunciationPhonetic.textContent = phonetic || "Not available from the dictionary right now";
+      elements.pronunciationPhonetic.textContent = soundGuide || "No clear sound guide found. Choose Listen to hear this word.";
+      elements.pronunciationIpa.textContent = phonetic;
+      elements.pronunciationIpaDetails.hidden = !phonetic;
       elements.pronunciationSyllables.textContent = syllableCount + " " + (syllableCount === 1 ? "syllable" : "syllables") + (hasSyllableLookup ? "" : " (offline estimate)");
       elements.pronunciationMeaning.textContent = pronunciationDefinitions(data);
       elements.pronunciationRhymes.replaceChildren();
@@ -1984,14 +2079,21 @@
       }
       const sources = [];
       if (data.entry) sources.push("dictionary definition");
-      if (data.datamuseEntry) sources.push("phonetic and syllable guide");
+      if (phonetic) sources.push("dictionary pronunciation");
+      if (hasSyllableLookup) sources.push("syllable guide");
       if (data.rhymes.length) sources.push("rhyme suggestions");
       if (sources.length) {
-        elements.pronunciationStatus.textContent = "Showing " + sources.join(", ") + ". Pronunciation details can be approximate, especially for names or unusual words.";
+        let status = "Showing " + sources.join(", ") + ".";
+        if (soundGuide) status += " The plain-letter guide is an approximation; accents can differ.";
+        else if (phonetic) status += " Open the IPA disclosure for the dictionary transcription, or choose Listen.";
+        else status += " A verified phonetic spelling was not found for this word; choose Listen to hear it.";
+        elements.pronunciationStatus.textContent = status;
       } else if (!data.vocabulary) {
         elements.pronunciationStatus.textContent = "Live dictionary lookup supports English and Spanish. You can still hear this word with your browser's speech voice; the syllable count is an estimate.";
-      } else {
+      } else if (!data.online) {
         elements.pronunciationStatus.textContent = "Dictionary services are unavailable. The syllable count is an offline estimate; use Listen to hear the selected word with your browser's speech voice.";
+      } else {
+        elements.pronunciationStatus.textContent = "No verified pronunciation was found for this word. Use Listen to hear it with your browser's speech voice.";
       }
       const audio = data.entry && Array.isArray(data.entry.phonetics) ? data.entry.phonetics.find(item => item && item.audio)?.audio : "";
       let audioUrl = "";
@@ -2015,6 +2117,8 @@
       elements.pronunciationWord.textContent = selected.word;
       elements.pronunciationStatus.textContent = "Looking up pronunciation, syllables, and rhymes for “" + selected.word + "”…";
       elements.pronunciationPhonetic.textContent = "Looking up…";
+      elements.pronunciationIpa.textContent = "";
+      elements.pronunciationIpaDetails.hidden = true;
       elements.pronunciationSyllables.textContent = estimateSyllableCount(selected.word) + " syllables (offline estimate)";
       elements.pronunciationRhymes.textContent = "Looking up…";
       elements.pronunciationMeaning.textContent = "Looking up…";
